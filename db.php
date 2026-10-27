@@ -7,7 +7,7 @@ $user = getenv("DB_USER");
 $password = getenv("DB_PASSWORD");
 $database = getenv("DB_NAME");
 $port = (int) (getenv("DB_PORT") ?: 3306);
-$caFile = getenv("DB_SSL_CA");
+$caFile = __DIR__ . "/ca.pem";
 
 if (!$host || !$user || !$password || !$database) {
     error_log("Missing required database environment variables.");
