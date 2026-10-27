@@ -23,8 +23,8 @@ if (!$conn) {
     exit("Database connection failed.");
 }
 
-if (!$caFile || !is_file($caFile) || !is_readable($caFile)) {
-    error_log("Aiven SSL CA certificate is missing or unreadable.");
+if (!is_file($caFile) || !is_readable($caFile)) {
+    error_log("CA certificate not found at: " . $caFile);
     http_response_code(500);
     exit("Database SSL certificate configuration is missing.");
 }
