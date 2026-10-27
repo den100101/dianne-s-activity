@@ -23,6 +23,11 @@ if (!$conn) {
     exit("Database connection failed.");
 }
 
+error_log("DB_SSL_CA value: " . var_export(getenv("DB_SSL_CA"), true));
+error_log("Resolved CA path: " . $caFile);
+error_log("CA file exists: " . (file_exists($caFile) ? "yes" : "no"));
+error_log("CA file readable: " . (is_readable($caFile) ? "yes" : "no"));
+
 if (!is_file($caFile) || !is_readable($caFile)) {
     error_log("CA certificate not found at: " . $caFile);
     http_response_code(500);
