@@ -5,6 +5,8 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
   session_start();
 }
 
+$message = "";
+
 if (isset($_POST["submit-btn"])) {
   $username = trim($_POST["usernamelog"] ?? "");
   $password = $_POST["passwordlog"] ?? "";
@@ -15,13 +17,17 @@ if (isset($_POST["submit-btn"])) {
          WHERE USERNAME = ?"
   );
 
-  $stmt->bind_param("s", $username);
-  $stmt->execute();
+  if (!$stmt) {
+    error_log("Login query preparation failed: " . $conn->error);
+    $message = "Something went wrong. Please try again.";
+  } else {
+    $stmt->bind_param("s", $username);
+    $stmt->execute();
 
-  $result = $stmt->get_result();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
 
-  if ($row = $result->fetch_assoc()) {
-    if (password_verify($password, $row["PASSWORD"])) {
+    if ($row && password_verify($password, $row["PASSWORD"])) {
       session_regenerate_id(true);
 
       $_SESSION["USER_ID"] = $row["ID"];
@@ -33,14 +39,14 @@ if (isset($_POST["submit-btn"])) {
 
       header("Location: tblcourse.php");
       exit();
+    } elseif ($row) {
+      $message = "Password is incorrect.";
+    } else {
+      $message = "Username is invalid.";
     }
 
-    $message = "Password is incorrect.";
-  } else {
-    $message = "Username is invalid.";
+    $stmt->close();
   }
-
-  $stmt->close();
 }
 ?>
 
@@ -65,41 +71,52 @@ if (isset($_POST["submit-btn"])) {
 
     <div class="auth-card">
       <div class="crest">🌸</div>
+
       <h2 class="script">Welcome Back</h2>
       <p class="sub">Log in to see your courses 💕</p>
 
-      <?php if ($message): ?>
+      <?php if ($message !== ""): ?>
         <div class="alert">
-          <?= htmlspecialchars($message) ?>
+          <?= htmlspecialchars($message, ENT_QUOTES, "UTF-8") ?>
         </div>
       <?php endif; ?>
 
-      <form method="post">
+      <form method="post" action="">
         <div class="field">
-          <label>USERNAME</label>
+          <label for="usernamelog">USERNAME</label>
+
           <div class="input-wrap">
             <span class="ico">🌷</span>
+
             <input
               type="text"
+              id="usernamelog"
               name="usernamelog"
               placeholder="Your username"
+              value="<?= htmlspecialchars($_POST["usernamelog"] ?? "", ENT_QUOTES, "UTF-8") ?>"
+              autocomplete="username"
               required>
           </div>
         </div>
 
         <div class="field">
-          <label>PASSWORD</label>
+          <label for="pw">PASSWORD</label>
+
           <div class="input-wrap">
             <span class="ico">🔒</span>
+
             <input
               type="password"
               name="passwordlog"
               id="pw"
               placeholder="Your password"
+              autocomplete="current-password"
               required>
+
             <button
               type="button"
               class="toggle"
+              aria-label="Show or hide password"
               onclick="var i=document.getElementById('pw');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'👁':'🙈'">👁</button>
           </div>
         </div>
