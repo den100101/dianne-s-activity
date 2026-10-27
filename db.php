@@ -1,4 +1,3 @@
-
 <?php
 mysqli_report(MYSQLI_REPORT_OFF);
 
@@ -7,12 +6,18 @@ $user = getenv("DB_USER");
 $password = getenv("DB_PASSWORD");
 $database = getenv("DB_NAME");
 $port = (int) (getenv("DB_PORT") ?: 3306);
-$caFile = getenv("DB_SSL_CA") ?: (__DIR__ . "/ca.pem");;
+$caFile = getenv("DB_SSL_CA") ?: (__DIR__ . "/ca.pem");
 
 if (!$host || !$user || !$password || !$database) {
     error_log("Missing required database environment variables.");
     http_response_code(500);
     exit("Database configuration is missing.");
+}
+
+if (!is_file($caFile) || !is_readable($caFile)) {
+    error_log("Database SSL certificate is missing or unreadable.");
+    http_response_code(500);
+    exit("Database SSL certificate configuration is missing.");
 }
 
 $conn = mysqli_init();
@@ -21,17 +26,6 @@ if (!$conn) {
     error_log("Failed to initialize MySQL connection.");
     http_response_code(500);
     exit("Database connection failed.");
-}
-
-error_log("DB_SSL_CA value: " . var_export(getenv("DB_SSL_CA"), true));
-error_log("Resolved CA path: " . $caFile);
-error_log("CA file exists: " . (file_exists($caFile) ? "yes" : "no"));
-error_log("CA file readable: " . (is_readable($caFile) ? "yes" : "no"));
-
-if (!is_file($caFile) || !is_readable($caFile)) {
-    error_log("CA certificate not found at: " . $caFile);
-    http_response_code(500);
-    exit("Database SSL certificate configuration is missing.");
 }
 
 $conn->ssl_set(null, null, $caFile, null, null);
