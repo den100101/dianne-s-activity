@@ -165,7 +165,7 @@ $users = $usersResult->fetch_assoc()["total_users"];
         <?php endif; ?>
 
         <?php if (in_array($role, ["Admin", "Registrar", "Dean"], true)): ?>
-          <a href="Instructor.php">👩‍🏫 Instructors</a>
+          <a href="Instructors.php">👩‍🏫 Instructors</a>
         <?php endif; ?>
 
         <?php if ($canManageCourses): ?>
