@@ -1,3 +1,5 @@
 <?php
-header("Location: Instructor.php");
-exit;
+require_once __DIR__ . "/includes/auth.php";
+requirePageAccess("Instructor");
+
+$role = currentRole();
