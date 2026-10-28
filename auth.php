@@ -1,7 +1,5 @@
-
 <?php
 require_once __DIR__ . "/db.php";
-
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
@@ -16,11 +14,12 @@ function currentRole(): string
 {
     return $_SESSION["USERTYPE"] ?? "";
 }
+
 function requireRole(array $allowedRoles): void
 {
-    $role = $_SESSION['USERTYPE'] ?? '';
+    $role = $_SESSION["USERTYPE"] ?? "";
 
-    if ($role === 'Admin') {
+    if ($role === "Admin") {
         return;
     }
 
@@ -33,12 +32,12 @@ function requireRole(array $allowedRoles): void
 function requirePageAccess(string $page): void
 {
     $permissions = [
-        'Subjects' => ['Admin', 'Registrar', 'Dean', 'Instructor', 'Student'],
-        'Term' => ['Admin', 'Registrar'],
-        'Instructor' => ['Admin', 'Registrar', 'Dean'],
-        'School Year' => ['Admin', 'Registrar'],
-        'Section' => ['Admin', 'Dean', 'Instructor'],
-        'YearLevel' => ['Admin', 'Dean'],
+        "Subjects" => ["Admin", "Registrar", "Dean", "Instructor", "Student"],
+        "Term" => ["Admin", "Registrar"],
+        "Instructor" => ["Admin", "Registrar", "Dean"],
+        "School Year" => ["Admin", "Registrar"],
+        "Section" => ["Admin", "Dean", "Instructor"],
+        "YearLevel" => ["Admin", "Dean"],
     ];
 
     if (!isset($permissions[$page])) {
