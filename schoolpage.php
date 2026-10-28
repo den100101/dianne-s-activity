@@ -245,22 +245,53 @@ if ($query) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= e($page["title"]) ?> | Blossom</title>
 
+
+
     <style>
+        :root {
+            --pink: #ec4899;
+            --rose: #f472b6;
+            --lav: #c084fc;
+            --peach: #fdba74;
+            --cream: #fff5f9;
+            --ink: #4a2c40;
+            --muted: #9d7a90;
+            --line: #fbd5e5;
+        }
+
         * {
             box-sizing: border-box;
         }
 
+        html {
+            scroll-behavior: smooth;
+        }
+
         body {
             margin: 0;
-            padding: 30px;
-            font-family: Arial, sans-serif;
-            background: #f5f7fb;
-            color: #243047;
+            padding: 32px 36px;
+            min-height: 100vh;
+            font-family: "Poppins", system-ui, sans-serif;
+            color: var(--ink);
+            background: var(--cream);
+        }
+
+        button,
+        input {
+            font-family: inherit;
+        }
+
+        button:focus-visible,
+        a:focus-visible,
+        input:focus-visible {
+            outline: 3px solid var(--lav);
+            outline-offset: 3px;
         }
 
         .container {
+            width: 100%;
             max-width: 1100px;
-            margin: auto;
+            margin: 0 auto;
         }
 
         .page-header {
@@ -274,66 +305,93 @@ if ($query) {
 
         h1 {
             margin: 0 0 8px;
+            color: var(--pink);
             font-size: 28px;
+            font-weight: 700;
         }
 
         .subtitle {
             margin: 0;
-            color: #68758a;
+            color: var(--muted);
+            font-size: 14px;
         }
 
         .navigation {
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
-            margin-bottom: 24px;
+            margin-bottom: 26px;
+            padding: 10px;
+            border: 2px solid var(--line);
+            border-radius: 24px;
+            background: #fff;
         }
 
         .navigation a {
-            padding: 10px 14px;
-            border-radius: 7px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 11px 17px;
+            border-radius: 999px;
             text-decoration: none;
-            background: #e8edf5;
-            color: #26364d;
-            font-size: 14px;
+            background: #fff7fb;
+            color: var(--ink);
+            font-size: 13px;
+            font-weight: 600;
+            transition: background 0.2s, color 0.2s, transform 0.2s;
+        }
+
+        .navigation a:hover:not(.active) {
+            background: #fce7f3;
+            transform: translateY(-1px);
         }
 
         .navigation a.active {
-            color: white;
-            background: #315fc4;
+            color: #fff;
+            background: linear-gradient(135deg, var(--pink), var(--lav));
+            box-shadow: 0 8px 18px rgba(236, 72, 153, 0.25);
         }
 
         .card {
-            background: white;
-            border-radius: 12px;
-            padding: 24px;
-            margin-bottom: 24px;
-            box-shadow: 0 3px 14px rgba(0, 0, 0, 0.05);
+            padding: 26px;
+            margin-bottom: 26px;
+            background: #fff;
+            border: 2px solid var(--line);
+            border-radius: 28px;
+            box-shadow: 0 10px 30px rgba(236, 72, 153, 0.08);
         }
 
         .card h2 {
-            margin-top: 0;
-            font-size: 20px;
+            margin: 0 0 20px;
+            color: var(--pink);
+            font-size: 19px;
         }
 
         label {
             display: block;
             margin-bottom: 7px;
-            font-size: 14px;
-            font-weight: bold;
+            color: var(--pink);
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
         }
 
         input {
             width: 100%;
-            padding: 11px 12px;
-            border: 1px solid #d5dce7;
-            border-radius: 7px;
-            font-size: 14px;
+            min-width: 0;
+            padding: 13px 16px;
+            border: 2px solid var(--line);
+            border-radius: 999px;
+            background: #fff9fc;
+            color: var(--ink);
+            font-size: 13px;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
 
         input:focus {
-            outline: 2px solid #dce8ff;
-            border-color: #3768c5;
+            outline: none;
+            border-color: var(--rose);
+            box-shadow: 0 0 0 4px rgba(244, 114, 182, 0.16);
         }
 
         .form-row {
@@ -344,41 +402,61 @@ if ($query) {
 
         .form-row .field {
             flex: 1;
+            min-width: 0;
         }
 
         button {
             border: none;
-            border-radius: 7px;
-            padding: 11px 16px;
+            border-radius: 999px;
+            padding: 13px 22px;
             font-size: 14px;
-            font-weight: bold;
+            font-weight: 600;
             cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
         }
 
         .add-button {
-            color: white;
-            background: #315fc4;
+            flex-shrink: 0;
+            color: #fff;
+            background: linear-gradient(135deg, var(--pink), var(--lav));
+            box-shadow: 0 8px 18px rgba(236, 72, 153, 0.25);
+        }
+
+        .add-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(236, 72, 153, 0.32);
         }
 
         .delete-button {
-            color: #a51d2d;
-            background: #fde8eb;
+            padding: 8px 15px;
+            color: #be123c;
+            background: #ffe4e6;
+            font-size: 12px;
+        }
+
+        .delete-button:hover {
+            color: #fff;
+            background: #e11d48;
         }
 
         .message {
-            padding: 13px 15px;
-            margin-bottom: 20px;
-            border-radius: 8px;
+            padding: 14px 18px;
+            margin-bottom: 22px;
+            border: 2px solid transparent;
+            border-radius: 18px;
+            font-size: 13px;
         }
 
         .message.success {
-            color: #17683b;
-            background: #e5f7ec;
+            color: #15803d;
+            background: #dcfce7;
+            border-color: #86efac;
         }
 
         .message.error {
-            color: #9d2020;
-            background: #fdeaea;
+            color: #be123c;
+            background: #ffe4e6;
+            border-color: #fda4af;
         }
 
         .table-header {
@@ -387,7 +465,7 @@ if ($query) {
             align-items: center;
             gap: 12px;
             flex-wrap: wrap;
-            margin-bottom: 18px;
+            margin-bottom: 14px;
         }
 
         .table-header h2 {
@@ -396,48 +474,123 @@ if ($query) {
 
         .search {
             max-width: 280px;
+            background: #fff9fc;
         }
 
         .table-wrapper {
+            width: 100%;
             overflow-x: auto;
         }
 
         table {
             width: 100%;
             min-width: 520px;
-            border-collapse: collapse;
-        }
-
-        th,
-        td {
-            padding: 13px 12px;
-            border-bottom: 1px solid #e8edf3;
-            text-align: left;
-            font-size: 14px;
+            border-collapse: separate;
+            border-spacing: 0 10px;
         }
 
         th {
-            color: #536176;
-            background: #f8f9fc;
+            padding: 0 16px 8px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-align: left;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 14px 16px;
+            background: #fff7fb;
+            border: none;
+            font-size: 14px;
+            vertical-align: middle;
+        }
+
+        tbody tr {
+            transition: transform 0.2s;
+        }
+
+        tbody tr:hover {
+            transform: translateY(-1px);
+        }
+
+        tbody tr:hover td {
+            background: #fce7f3;
+        }
+
+        tbody td:first-child {
+            border-radius: 18px 0 0 18px;
+        }
+
+        tbody td:last-child {
+            border-radius: 0 18px 18px 0;
         }
 
         .empty {
-            padding: 24px;
+            padding: 26px;
+            color: var(--muted);
             text-align: center;
-            color: #68758a;
         }
 
         .delete-form {
             margin: 0;
         }
 
-        @media (max-width: 650px) {
+        .page-header>a {
+            color: #9d174d !important;
+            font-size: 13px;
+            font-weight: 600;
+            text-decoration: none !important;
+            padding: 10px 16px;
+            border: 2px solid var(--line);
+            border-radius: 999px;
+            background: #fff;
+            transition: background 0.2s;
+        }
+
+        .page-header>a:hover {
+            background: #fce7f3;
+        }
+
+        @media (max-width: 1100px) {
             body {
-                padding: 16px;
+                padding: 28px 22px;
+            }
+        }
+
+        @media (max-width: 860px) {
+            body {
+                padding: 22px 16px;
             }
 
             .card {
-                padding: 17px;
+                padding: 22px 18px;
+            }
+
+            .navigation {
+                border-radius: 20px;
+            }
+        }
+
+        @media (max-width: 650px) {
+            body {
+                padding: 18px 12px;
+            }
+
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .card {
+                padding: 18px 14px;
+                border-radius: 22px;
             }
 
             .form-row {
@@ -453,8 +606,24 @@ if ($query) {
                 max-width: none;
                 width: 100%;
             }
+
+            .navigation {
+                gap: 6px;
+                padding: 8px;
+            }
+
+            .navigation a {
+                flex: 1 1 auto;
+                padding: 10px 12px;
+            }
+
+            th,
+            td {
+                padding: 12px 10px;
+            }
         }
     </style>
+
 </head>
 
 <body>

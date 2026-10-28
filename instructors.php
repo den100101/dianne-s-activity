@@ -1,3 +1,3 @@
 <?php
-header("Location: Instructor.PHP");
+header("Location: Instructor.php");
 exit;
