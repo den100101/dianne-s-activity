@@ -1,3 +1,4 @@
+
 <?php
 require_once __DIR__ . "/db.php";
 
@@ -5,9 +6,13 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
 
-if (!isset($_SESSION["USERNAME"], $_SESSION["USERTYPE"])) {
+if (
+    !isset($_SESSION["USERNAME"], $_SESSION["USERTYPE"])
+    || $_SESSION["USERNAME"] === ""
+    || $_SESSION["USERTYPE"] === ""
+) {
     header("Location: login.php");
-    exit();
+    exit;
 }
 
 function currentRole(): string
@@ -17,7 +22,7 @@ function currentRole(): string
 
 function requireRole(array $allowedRoles): void
 {
-    $role = $_SESSION["USERTYPE"] ?? "";
+    $role = currentRole();
 
     if ($role === "Admin") {
         return;

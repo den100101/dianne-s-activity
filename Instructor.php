@@ -1,64 +1,96 @@
 <?php
-require_once "auth.php";
+require_once __DIR__ . "/auth.php";
 requirePageAccess("Instructor");
 
+$role = currentRole();
+
+$canAdd = in_array($role, ["Admin", "Registrar", "Dean"], true);
+
 $message = "";
+$messageType = "success";
 
-$uploadDir = __DIR__ . "/uploads/instructors/";
+/*
+|--------------------------------------------------------------------------
+| Helper
+|--------------------------------------------------------------------------
+*/
 
-if (!is_dir($uploadDir)) {
-    mkdir($uploadDir, 0755, true);
+function e($value): string
+{
+    return htmlspecialchars((string) $value, ENT_QUOTES, "UTF-8");
 }
 
-if (
-    $_SERVER["REQUEST_METHOD"] === "POST"
-    && isset($_POST["add-instructor"])
-) {
+/*
+|--------------------------------------------------------------------------
+| Add instructor
+|--------------------------------------------------------------------------
+*/
 
-    requireRole(["Admin", "Registrar", "Dean"]);
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["add_instructor"])) {
+    if (!$canAdd) {
+        http_response_code(403);
+        exit("403 Forbidden: You do not have permission to add instructors.");
+    }
 
     $salutation = trim($_POST["salutation"] ?? "");
     $firstname = trim($_POST["firstname"] ?? "");
     $middlename = trim($_POST["middlename"] ?? "");
     $lastname = trim($_POST["lastname"] ?? "");
-    $photo = null;
 
     if ($salutation === "" || $firstname === "" || $lastname === "") {
-        $message = "Salutation, first name, and last name are required.";
+        $message = "Please complete the required fields.";
+        $messageType = "error";
     } else {
-        if (
-            isset($_FILES["photo"]) &&
-            $_FILES["photo"]["error"] !== UPLOAD_ERR_NO_FILE
-        ) {
-            $file = $_FILES["photo"];
+        $photoPath = "";
 
-            if ($file["error"] !== UPLOAD_ERR_OK) {
-                $message = "Photo upload failed.";
-            } elseif ($file["size"] > 2 * 1024 * 1024) {
-                $message = "Photo must be 2 MB or smaller.";
+        if (
+            isset($_FILES["photo"])
+            && $_FILES["photo"]["error"] !== UPLOAD_ERR_NO_FILE
+        ) {
+            $photo = $_FILES["photo"];
+
+            if ($photo["error"] !== UPLOAD_ERR_OK) {
+                $message = "The photo upload failed.";
+                $messageType = "error";
+            } elseif ($photo["size"] > 2 * 1024 * 1024) {
+                $message = "The photo must not exceed 2 MB.";
+                $messageType = "error";
             } else {
-                $imageInfo = getimagesize($file["tmp_name"]);
+                $imageInfo = getimagesize($photo["tmp_name"]);
                 $mime = $imageInfo["mime"] ?? "";
 
-                $extensions = [
+                $allowedTypes = [
                     "image/jpeg" => "jpg",
                     "image/png" => "png",
-                    "image/webp" => "webp"
+                    "image/webp" => "webp",
                 ];
 
-                if (!isset($extensions[$mime])) {
-                    $message = "Only JPG, PNG, and WEBP photos are allowed.";
+                if (!$imageInfo || !isset($allowedTypes[$mime])) {
+                    $message = "Only JPG, PNG, and WEBP images are allowed.";
+                    $messageType = "error";
                 } else {
-                    $filename = bin2hex(random_bytes(16))
-                        . "." . $extensions[$mime];
+                    $uploadDirectory = __DIR__ . "/uploads/instructors/";
 
-                    if (move_uploaded_file(
-                        $file["tmp_name"],
-                        $uploadDir . $filename
-                    )) {
-                        $photo = "uploads/instructors/" . $filename;
+                    if (
+                        !is_dir($uploadDirectory)
+                        && !mkdir($uploadDirectory, 0755, true)
+                        && !is_dir($uploadDirectory)
+                    ) {
+                        $message = "Unable to create the photo upload directory.";
+                        $messageType = "error";
                     } else {
-                        $message = "Could not save the photo.";
+                        $filename = bin2hex(random_bytes(16))
+                            . "."
+                            . $allowedTypes[$mime];
+
+                        $destination = $uploadDirectory . $filename;
+
+                        if (move_uploaded_file($photo["tmp_name"], $destination)) {
+                            $photoPath = "uploads/instructors/" . $filename;
+                        } else {
+                            $message = "Unable to save the instructor photo.";
+                            $messageType = "error";
+                        }
                     }
                 }
             }
@@ -67,207 +99,427 @@ if (
         if ($message === "") {
             $stmt = $conn->prepare(
                 "INSERT INTO tbl_instructors
-                 (SALUTATION, FIRSTNAME, MIDDLENAME, LASTNAME, PHOTO)
-                 VALUES (?, ?, ?, ?, ?)"
+                (SALUTATION, FIRSTNAME, MIDDLENAME, LASTNAME, PHOTO)
+                VALUES (?, ?, ?, ?, ?)"
             );
 
-            $stmt->bind_param(
-                "sssss",
-                $salutation,
-                $firstname,
-                $middlename,
-                $lastname,
-                $photo
-            );
+            if (!$stmt) {
+                error_log("Instructor insert preparation failed: " . $conn->error);
+                $message = "Unable to add the instructor.";
+                $messageType = "error";
+            } else {
+                $stmt->bind_param(
+                    "sssss",
+                    $salutation,
+                    $firstname,
+                    $middlename,
+                    $lastname,
+                    $photoPath
+                );
 
-            if ($stmt->execute()) {
-                header("Location: Instructor.PHP?success=1");
-                exit();
+                if ($stmt->execute()) {
+                    $stmt->close();
+
+                    header("Location: Instructor.PHP?success=1");
+                    exit;
+                }
+
+                error_log("Instructor insert failed: " . $stmt->error);
+                $message = "Unable to add the instructor. Please check the information.";
+                $messageType = "error";
+
+                $stmt->close();
+
+                if ($photoPath !== "") {
+                    $savedPhoto = __DIR__ . "/" . $photoPath;
+
+                    if (is_file($savedPhoto)) {
+                        unlink($savedPhoto);
+                    }
+                }
             }
-
-            if ($photo && is_file(__DIR__ . "/" . $photo)) {
-                unlink(__DIR__ . "/" . $photo);
-            }
-
-            $message = "Failed to save instructor.";
-            $stmt->close();
         }
     }
 }
 
-if (isset($_GET["success"])) {
-    $message = "Instructor added successfully!";
+if (isset($_GET["success"]) && $_GET["success"] === "1") {
+    $message = "Instructor added successfully.";
+    $messageType = "success";
 }
 
-$canAdd = in_array(
-    $_SESSION["USERTYPE"],
-    ["Admin", "Registrar", "Dean"],
-    true
+/*
+|--------------------------------------------------------------------------
+| Retrieve instructors
+|--------------------------------------------------------------------------
+*/
+
+$instructors = [];
+$query = $conn->query(
+    "SELECT ID, SALUTATION, FIRSTNAME, MIDDLENAME, LASTNAME, PHOTO
+     FROM tbl_instructors
+     ORDER BY ID DESC"
 );
 
-$instructors = $conn->query(
-    "SELECT ID, SALUTATION, FIRSTNAME, MIDDLENAME,
-            LASTNAME, PHOTO
-     FROM tbl_instructors
-     ORDER BY LASTNAME, FIRSTNAME"
-);
+if ($query) {
+    while ($row = $query->fetch_assoc()) {
+        $instructors[] = $row;
+    }
+} else {
+    error_log("Instructor retrieval failed: " . $conn->error);
+    $message = "Unable to load instructors.";
+    $messageType = "error";
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Instructors</title>
-    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instructors | Blossom</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 30px;
+            font-family: Arial, sans-serif;
+            background: #f5f7fb;
+            color: #243047;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: auto;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 24px;
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            margin: 0;
+            color: #68758a;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 3px 14px rgba(0, 0, 0, 0.05);
+        }
+
+        .card h2 {
+            margin-top: 0;
+            font-size: 20px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 18px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+
+        .field.full {
+            grid-column: 1 / -1;
+        }
+
+        label {
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 11px 12px;
+            border: 1px solid #d5dce7;
+            border-radius: 7px;
+            font-size: 14px;
+            background: white;
+        }
+
+        input:focus,
+        select:focus {
+            outline: 2px solid #dce8ff;
+            border-color: #3768c5;
+        }
+
+        button,
+        .back-link {
+            display: inline-block;
+            border: none;
+            border-radius: 7px;
+            padding: 11px 17px;
+            background: #315fc4;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .back-link {
+            background: #e8edf5;
+            color: #26364d;
+        }
+
+        .message {
+            padding: 13px 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+        }
+
+        .message.success {
+            color: #17683b;
+            background: #e5f7ec;
+        }
+
+        .message.error {
+            color: #9d2020;
+            background: #fdeaea;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 650px;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 13px 12px;
+            border-bottom: 1px solid #e8edf3;
+            font-size: 14px;
+        }
+
+        th {
+            color: #536176;
+            background: #f8f9fc;
+        }
+
+        .profile-photo {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            object-fit: cover;
+            background: #edf0f5;
+        }
+
+        .no-photo {
+            display: inline-flex;
+            width: 44px;
+            height: 44px;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: #edf0f5;
+            color: #68758a;
+            font-size: 12px;
+        }
+
+        .empty {
+            padding: 25px;
+            text-align: center;
+            color: #68758a;
+        }
+
+        @media (max-width: 650px) {
+            body {
+                padding: 16px;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .field.full {
+                grid-column: auto;
+            }
+
+            .card {
+                padding: 17px;
+            }
+        }
+    </style>
 </head>
 
 <body>
-    <div class="app">
-        <aside class="side">
-            <div class="brand script">Blossom</div>
+    <div class="container">
 
-            <div class="profile">
-                <div class="avatar">
-                    <?= strtoupper(htmlspecialchars(substr($_SESSION["USERNAME"], 0, 1))) ?>
-                </div>
-                <b><?= htmlspecialchars($_SESSION["USERNAME"]) ?></b>
-                <small><?= htmlspecialchars($_SESSION["USERTYPE"]) ?></small>
+        <header class="page-header">
+            <div>
+                <h1>Instructors</h1>
+                <p class="subtitle">Manage instructor information and profiles.</p>
             </div>
 
-            <nav class="menu">
-                <a href="tblcourse.php">📚 Subjects</a>
+            <a class="back-link" href="tblcourse.php">Back to Subjects</a>
+        </header>
 
-                <?php if (
-                    $_SESSION["USERTYPE"] === "Admin"
-                    || $_SESSION["USERTYPE"] === "Registrar"
-                ): ?>
-                    <a href="term.php">📅 Term</a>
-                    <a href="schoolyear.php">🏫 School Year</a>
-                <?php endif; ?>
-
-                <?php if (in_array(
-                    $_SESSION["USERTYPE"],
-                    ["Admin", "Registrar", "Dean"],
-                    true
-                )): ?>
-                    <a class="active" href="Instructor.PHP">👩‍🏫 Instructors</a>
-                <?php endif; ?>
-
-                <a class="out" href="logout.php">🚪 Logout</a>
-            </nav>
-        </aside>
-
-        <main class="main">
-            <div class="banner">
-                <h1>Instructor Management 🌸</h1>
-                <p>View and manage instructor records.</p>
+        <?php if ($message !== ""): ?>
+            <div class="message <?= e($messageType) ?>">
+                <?= e($message) ?>
             </div>
+        <?php endif; ?>
 
-            <?php if ($message !== ""): ?>
-                <div class="alert">
-                    <?= htmlspecialchars($message) ?>
-                </div>
-            <?php endif; ?>
+        <?php if ($canAdd): ?>
+            <section class="card">
+                <h2>Add Instructor</h2>
 
-            <?php if ($canAdd): ?>
-                <div class="panel">
-                    <h3>➕ Add Instructor</h3>
-
-                    <form method="POST"
-                        enctype="multipart/form-data"
-                        class="add-form">
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="form-grid">
 
                         <div class="field">
-                            <label>SALUTATION</label>
-                            <div class="input-wrap">
-                                <input name="salutation"
-                                    placeholder="Mr., Ms., Dr."
-                                    required>
-                            </div>
+                            <label for="salutation">Salutation *</label>
+                            <select id="salutation" name="salutation" required>
+                                <option value="">Select salutation</option>
+                                <option value="Mr.">Mr.</option>
+                                <option value="Ms.">Ms.</option>
+                                <option value="Mrs.">Mrs.</option>
+                                <option value="Dr.">Dr.</option>
+                                <option value="Prof.">Prof.</option>
+                            </select>
                         </div>
 
                         <div class="field">
-                            <label>FIRST NAME</label>
-                            <div class="input-wrap">
-                                <input name="firstname" required>
-                            </div>
+                            <label for="firstname">First Name *</label>
+                            <input
+                                id="firstname"
+                                name="firstname"
+                                type="text"
+                                maxlength="100"
+                                required>
                         </div>
 
                         <div class="field">
-                            <label>MIDDLE NAME</label>
-                            <div class="input-wrap">
-                                <input name="middlename">
-                            </div>
+                            <label for="middlename">Middle Name</label>
+                            <input
+                                id="middlename"
+                                name="middlename"
+                                type="text"
+                                maxlength="100">
                         </div>
 
                         <div class="field">
-                            <label>LAST NAME</label>
-                            <div class="input-wrap">
-                                <input name="lastname" required>
-                            </div>
+                            <label for="lastname">Last Name *</label>
+                            <input
+                                id="lastname"
+                                name="lastname"
+                                type="text"
+                                maxlength="100"
+                                required>
                         </div>
 
-                        <div class="field">
-                            <label>PHOTO (MAX 2 MB)</label>
-                            <div class="input-wrap">
-                                <input type="file"
-                                    name="photo"
-                                    accept=".jpg,.jpeg,.png,.webp">
-                            </div>
+                        <div class="field full">
+                            <label for="photo">Profile Photo (JPG, PNG, WEBP; max 2 MB)</label>
+                            <input
+                                id="photo"
+                                name="photo"
+                                type="file"
+                                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
                         </div>
 
-                        <button class="btn"
-                            type="submit"
-                            name="add-instructor">
-                            Save Instructor
-                        </button>
-                    </form>
-                </div>
-            <?php endif; ?>
+                        <div class="field full">
+                            <button type="submit" name="add_instructor">
+                                Add Instructor
+                            </button>
+                        </div>
 
-            <div class="panel">
-                <h3>👩‍🏫 Instructor List</h3>
+                    </div>
+                </form>
+            </section>
+        <?php endif; ?>
 
-                <div class="table-wrap">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Photo</th>
-                                <th>Salutation</th>
-                                <th>First Name</th>
-                                <th>Middle Name</th>
-                                <th>Last Name</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php while ($row = $instructors->fetch_assoc()): ?>
+        <section class="card">
+            <h2>Instructor List</h2>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Photo</th>
+                            <th>ID</th>
+                            <th>Full Name</th>
+                            <th>Salutation</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        <?php if (count($instructors) > 0): ?>
+                            <?php foreach ($instructors as $instructor): ?>
                                 <tr>
-                                    <td><?= (int)$row["ID"] ?></td>
                                     <td>
-                                        <?php if ($row["PHOTO"]): ?>
+                                        <?php
+                                        $photo = trim($instructor["PHOTO"] ?? "");
+                                        $photoFile = $photo !== ""
+                                            ? __DIR__ . "/" . $photo
+                                            : "";
+                                        ?>
+
+                                        <?php if (
+                                            $photo !== ""
+                                            && is_file($photoFile)
+                                            && strpos($photo, "uploads/instructors/") === 0
+                                        ): ?>
                                             <img
-                                                src="<?= htmlspecialchars($row["PHOTO"]) ?>"
-                                                alt="Instructor photo"
-                                                width="55"
-                                                height="55"
-                                                style="object-fit:cover;border-radius:50%">
+                                                class="profile-photo"
+                                                src="<?= e($photo) ?>"
+                                                alt="Instructor photo">
                                         <?php else: ?>
-                                            No photo
+                                            <span class="no-photo">N/A</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td><?= htmlspecialchars($row["SALUTATION"]) ?></td>
-                                    <td><?= htmlspecialchars($row["FIRSTNAME"]) ?></td>
-                                    <td><?= htmlspecialchars($row["MIDDLENAME"] ?? "") ?></td>
-                                    <td><?= htmlspecialchars($row["LASTNAME"]) ?></td>
+
+                                    <td><?= e($instructor["ID"]) ?></td>
+
+                                    <td>
+                                        <?= e(trim(
+                                            ($instructor["FIRSTNAME"] ?? "") . " "
+                                                . ($instructor["MIDDLENAME"] ?? "") . " "
+                                                . ($instructor["LASTNAME"] ?? "")
+                                        )) ?>
+                                    </td>
+
+                                    <td><?= e($instructor["SALUTATION"]) ?></td>
                                 </tr>
-                            <?php endwhile; ?>
-                        </tbody>
-                    </table>
-                </div>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="4" class="empty">
+                                    No instructors have been added yet.
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
-        </main>
+        </section>
+
     </div>
 </body>
 
